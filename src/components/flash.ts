@@ -58,8 +58,27 @@ export class FlashView {
     `).join('');
 
     el.innerHTML = `
+<<<<<<< HEAD
       <!-- Full-screen background (brightness filter applied here) -->
       <div class="flash-bg" aria-hidden="true"></div>
+=======
+      <!-- Background layer (brightness filter applied here only) -->
+      <div class="flash-bg" aria-hidden="true"></div>
+
+      <!-- Top Bar -->
+      <div class="flash-topbar" role="toolbar" aria-label="Flash controls">
+        <button class="flash-exit-btn" id="flash-exit-btn" aria-label="Exit Flash mode">
+          ← Exit
+        </button>
+        <div class="flash-status" aria-live="polite" aria-label="Status">
+          <span class="status-dot" id="wakelock-dot" aria-hidden="true"></span>
+          <span id="status-label">Flash</span>
+        </div>
+        <button class="flash-exit-btn" id="settings-flash-btn" aria-label="Open settings">
+          ⚙
+        </button>
+      </div>
+>>>>>>> 94c973a7034290d01fcdc8a8a0fa1d16af785faf
 
       <!-- Bottom sheet — slides up on tap -->
       <div
@@ -194,6 +213,10 @@ export class FlashView {
           this.updateUtilityUI(null);
         } else {
           startUtility(utilityId, (on, opacity) => {
+<<<<<<< HEAD
+=======
+            // Apply flash effect to background layer only, keeping controls visible
+>>>>>>> 94c973a7034290d01fcdc8a8a0fa1d16af785faf
             this.bg.style.opacity = on ? String(opacity ?? 1) : '0';
           });
           this.updateUtilityUI(utilityId);
@@ -291,6 +314,7 @@ export class FlashView {
     return this.el.querySelector<HTMLElement>('.flash-bg') ?? this.el;
   }
 
+<<<<<<< HEAD
   private toggleSheet(): void {
     if (this.sheetVisible) this.hideSheet();
     else this.showSheet();
@@ -315,6 +339,12 @@ export class FlashView {
   private setColor(colorId: ColorModeId): void {
     const mode = COLOR_MODES.find((m) => m.id === colorId);
     if (!mode) return;
+=======
+  private setColor(colorId: ColorModeId): void {
+    const mode = COLOR_MODES.find((m) => m.id === colorId);
+    if (!mode) return;
+
+>>>>>>> 94c973a7034290d01fcdc8a8a0fa1d16af785faf
     this.bg.style.backgroundColor = mode.color;
     updateSettings({ selectedColor: colorId });
     this.el.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach((btn) => {
@@ -326,6 +356,11 @@ export class FlashView {
       stopUtility();
       this.updateUtilityUI(null);
     }
+<<<<<<< HEAD
+=======
+
+    // Reset background opacity
+>>>>>>> 94c973a7034290d01fcdc8a8a0fa1d16af785faf
     this.bg.style.opacity = '1';
   }
 
@@ -338,9 +373,24 @@ export class FlashView {
   }
 
   private applyBrightness(value: number): void {
+<<<<<<< HEAD
     const normalized = value / 100;
     const bg = this.el.querySelector<HTMLElement>('.flash-bg');
     if (bg) bg.style.filter = `brightness(${normalized})`;
+=======
+    // Apply brightness only to the background layer, not the controls overlay.
+    // We use a CSS custom property that drives the background pseudo-element opacity.
+    const normalized = value / 100;
+    this.el.style.setProperty('--flash-brightness', String(normalized));
+    // The background div (first child) gets the filter; controls are siblings above it.
+    const bg = this.el.querySelector<HTMLElement>('.flash-bg');
+    if (bg) {
+      bg.style.filter = `brightness(${normalized})`;
+    } else {
+      // Fallback: apply to whole element (controls will dim too, acceptable degradation)
+      this.el.style.filter = `brightness(${normalized})`;
+    }
+>>>>>>> 94c973a7034290d01fcdc8a8a0fa1d16af785faf
   }
 
   private resetCursorTimer(): void {
@@ -376,6 +426,12 @@ export class FlashView {
     this.el.classList.remove('flash-view--hidden');
     this.isVisible = true;
 
+<<<<<<< HEAD
+=======
+    // Reset background opacity
+    this.bg.style.opacity = '1';
+
+>>>>>>> 94c973a7034290d01fcdc8a8a0fa1d16af785faf
     // Fullscreen
     if (settings.autoFullscreen) {
       const ok = await enterFullscreen();
