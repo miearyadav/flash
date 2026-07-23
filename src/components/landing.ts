@@ -20,44 +20,33 @@ export class LandingView {
     el.setAttribute('aria-label', 'Flash – Screen Flashlight');
 
     el.innerHTML = `
-      <div class="logo animate-scale-in">
-        <div class="logo__icon" aria-hidden="true">⚡</div>
-        <h1 class="logo__wordmark">Flash</h1>
-      </div>
-
-      <div class="hero animate-fade-in animate-delay-1">
-        <p class="hero__tagline">Your screen, at full brightness.</p>
-        <p class="hero__description">
-          Transform any display into a powerful flashlight.
-          Perfect for emergencies, reading, photography, and more.
-        </p>
-      </div>
+      <div class="landing-wordmark animate-fade-in">Flash</div>
 
       <button
-        class="cta-button animate-fade-in animate-delay-2"
+        class="power-btn animate-scale-in"
         id="launch-btn"
-        aria-label="Activate Flash – open full-screen white light"
+        aria-label="Turn on Flash"
       >
-        <span class="cta-button__icon" aria-hidden="true">⚡</span>
-        Activate Flash
+        <span class="power-btn__ring" aria-hidden="true"></span>
+        <span class="power-btn__ring power-btn__ring--2" aria-hidden="true"></span>
+        <svg class="power-btn__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 3v9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M6.34 6.34A9 9 0 1 0 17.66 6.34" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
       </button>
 
-      <div class="features animate-fade-in animate-delay-3" aria-label="Features">
-        <span class="feature-pill">7 Colors</span>
-        <span class="feature-pill">SOS Mode</span>
-        <span class="feature-pill">Strobe</span>
-        <span class="feature-pill">Wake Lock</span>
-        <span class="feature-pill">Fullscreen</span>
-        <span class="feature-pill">PWA</span>
-      </div>
+      <p class="landing-hint animate-fade-in animate-delay-2">Tap to turn on</p>
 
       <button
-        class="feature-pill animate-fade-in animate-delay-4"
+        class="landing-settings-btn animate-fade-in animate-delay-3"
         id="settings-btn"
         aria-label="Open settings"
-        style="cursor:pointer; margin-top: var(--space-2);"
       >
-        ⚙ Settings
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="18" height="18">
+          <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="1.8"/>
+        </svg>
+        Settings
       </button>
     `;
 
@@ -65,21 +54,16 @@ export class LandingView {
   }
 
   private bindEvents(): void {
-    const launchBtn = this.el.querySelector<HTMLButtonElement>('#launch-btn');
-    launchBtn?.addEventListener('click', () => {
+    this.el.querySelector<HTMLButtonElement>('#launch-btn')?.addEventListener('click', () => {
       bus.emit('view:change', 'flash');
     });
 
-    const settingsBtn = this.el.querySelector<HTMLButtonElement>('#settings-btn');
-    settingsBtn?.addEventListener('click', () => {
+    this.el.querySelector<HTMLButtonElement>('#settings-btn')?.addEventListener('click', () => {
       this.settingsPanel.open();
     });
 
-    // Keyboard shortcut: Space or Enter on focused button handled natively
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'f' || e.key === 'F') {
-        bus.emit('view:change', 'flash');
-      }
+      if (e.key === 'f' || e.key === 'F') bus.emit('view:change', 'flash');
     };
     document.addEventListener('keydown', onKeyDown);
     this.cleanups.push(() => document.removeEventListener('keydown', onKeyDown));

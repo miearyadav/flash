@@ -9,18 +9,21 @@ import type { ColorModeId, UtilityModeId } from '../core/types.js';
 
 export class FlashView {
   private readonly el: HTMLElement;
-  private readonly topbar: HTMLElement;
-  private readonly controls: HTMLElement;
+  private readonly sheet: HTMLElement;
   private readonly cleanups: Array<() => void> = [];
 
   private cursorTimer: ReturnType<typeof setTimeout> | null = null;
-  private controlsTimer: ReturnType<typeof setTimeout> | null = null;
+  private sheetVisible = false;
   private isVisible = false;
+
+  // Sheet drag state
+  private dragStartY = 0;
+  private dragCurrentY = 0;
+  private isDragging = false;
 
   constructor(container: HTMLElement) {
     this.el = this.buildFlashScreen();
-    this.topbar = this.el.querySelector('.flash-topbar')!;
-    this.controls = this.el.querySelector('.flash-controls')!;
+    this.sheet = this.el.querySelector('.flash-sheet')!;
     container.appendChild(this.el);
     this.bindEvents();
   }
@@ -30,82 +33,112 @@ export class FlashView {
     el.className = 'flash-view flash-view--hidden';
     el.id = 'flash-view';
     el.setAttribute('role', 'main');
-    el.setAttribute('aria-label', 'Flash active – screen flashlight');
-    el.setAttribute('aria-live', 'polite');
+    el.setAttribute('aria-label', 'Flash active');
 
-    // Build color swatches
-    const swatches = COLOR_MODES.map(
-      (mode) => `
+    const swatches = COLOR_MODES.map((mode) => `
       <button
         class="color-swatch${mode.id === 'pure-white' ? ' color-swatch--active' : ''}"
         style="background:${mode.color}"
         data-color="${mode.id}"
         aria-label="${mode.label}"
-        title="${mode.description}"
         aria-pressed="${mode.id === 'pure-white'}"
       ></button>
-    `
-    ).join('');
+    `).join('');
 
-    // Build utility buttons
-    const utilityBtns = UTILITY_MODES.map(
-      (u) => `
+    const utilityBtns = UTILITY_MODES.map((u) => `
       <button
         class="utility-btn"
         data-utility="${u.id}"
-        aria-label="${u.label}: ${u.description}"
+        aria-label="${u.label}"
         aria-pressed="false"
       >
-        <span aria-hidden="true">${u.icon}</span>
-        ${u.label}
+        <span class="utility-btn__icon" aria-hidden="true">${u.icon}</span>
+        <span class="utility-btn__label">${u.label}</span>
       </button>
-    `
-    ).join('');
+    `).join('');
 
     el.innerHTML = `
-      <!-- Background layer (brightness filter applied here only) -->
+      <!-- Full-screen background (brightness filter applied here) -->
       <div class="flash-bg" aria-hidden="true"></div>
 
-      <!-- Top Bar -->
-      <div class="flash-topbar" role="toolbar" aria-label="Flash controls">
-        <button class="flash-exit-btn" id="flash-exit-btn" aria-label="Exit Flash mode">
-          ← Exit
-        </button>
-        <div class="flash-status" aria-live="polite" aria-label="Status">
-          <span class="status-dot" id="wakelock-dot" aria-hidden="true"></span>
-          <span id="status-label">Flash</span>
-        </div>
-        <button class="flash-exit-btn" id="settings-flash-btn" aria-label="Open settings">
-          ⚙
-        </button>
-      </div>
-
-      <!-- Bottom Controls -->
-      <div class="flash-controls" role="group" aria-label="Color and utility controls">
-        <!-- Brightness -->
-        <div class="brightness-control">
-          <span class="brightness-icon" aria-hidden="true">☀</span>
-          <input
-            type="range"
-            class="brightness-slider"
-            id="brightness-slider"
-            min="10"
-            max="100"
-            value="100"
-            step="1"
-            aria-label="Brightness"
-          />
-          <span class="brightness-icon" aria-hidden="true" style="opacity:1">☀</span>
+      <!-- Bottom sheet — slides up on tap -->
+      <div
+        class="flash-sheet"
+        role="region"
+        aria-label="Flash controls"
+        aria-hidden="true"
+      >
+        <!-- Drag handle -->
+        <div class="flash-sheet__handle-area" id="sheet-handle-area" aria-hidden="true">
+          <div class="flash-sheet__handle"></div>
         </div>
 
-        <!-- Color Picker -->
-        <div class="color-picker" role="group" aria-label="Color modes">
-          ${swatches}
-        </div>
+        <!-- Sheet content -->
+        <div class="flash-sheet__content">
 
-        <!-- Utility Bar -->
-        <div class="utility-bar" role="group" aria-label="Utility modes">
-          ${utilityBtns}
+          <!-- Row 1: Brightness -->
+          <div class="sheet-section">
+            <div class="brightness-row">
+              <svg class="brightness-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" width="16" height="16">
+                <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              <input
+                type="range"
+                class="brightness-slider"
+                id="brightness-slider"
+                min="10"
+                max="100"
+                value="100"
+                step="1"
+                aria-label="Brightness"
+              />
+              <svg class="brightness-icon brightness-icon--bright" viewBox="0 0 24 24" fill="none" aria-hidden="true" width="20" height="20">
+                <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Row 2: Color swatches -->
+          <div class="sheet-section">
+            <div class="color-picker" role="group" aria-label="Color">
+              ${swatches}
+            </div>
+          </div>
+
+          <!-- Row 3: Utilities -->
+          <div class="sheet-section">
+            <div class="utility-bar" role="group" aria-label="Modes">
+              ${utilityBtns}
+            </div>
+          </div>
+
+          <!-- Row 4: Actions -->
+          <div class="sheet-section sheet-actions">
+            <button class="sheet-action-btn" id="flash-settings-btn" aria-label="Settings">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="18" height="18">
+                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="1.8"/>
+              </svg>
+              Settings
+            </button>
+
+            <button class="sheet-power-btn" id="flash-exit-btn" aria-label="Turn off Flash">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="20" height="20">
+                <path d="M12 3v9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                <path d="M6.34 6.34A9 9 0 1 0 17.66 6.34" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+              </svg>
+            </button>
+
+            <button class="sheet-action-btn" id="flash-fullscreen-btn" aria-label="Toggle fullscreen">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="18" height="18">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Fullscreen
+            </button>
+          </div>
+
         </div>
       </div>
     `;
@@ -114,24 +147,36 @@ export class FlashView {
   }
 
   private bindEvents(): void {
-    // Exit button
-    this.el.querySelector('#flash-exit-btn')?.addEventListener('click', () => {
+    // Tap on the bright background → toggle sheet
+    this.el.querySelector('.flash-bg')?.addEventListener('click', () => {
+      this.toggleSheet();
+    });
+
+    // Exit (power off)
+    this.el.querySelector('#flash-exit-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
       bus.emit('view:change', 'landing');
     });
 
-    // Settings button
-    this.el.querySelector('#settings-flash-btn')?.addEventListener('click', () => {
+    // Settings
+    this.el.querySelector('#flash-settings-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
       bus.emit('view:change', 'landing');
-      // Small delay to let landing view show first
       setTimeout(() => {
-        const settingsBtn = document.querySelector<HTMLButtonElement>('#settings-btn');
-        settingsBtn?.click();
-      }, 100);
+        document.querySelector<HTMLButtonElement>('#settings-btn')?.click();
+      }, 120);
+    });
+
+    // Fullscreen toggle
+    this.el.querySelector('#flash-fullscreen-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      void (isFullscreen() ? exitFullscreen() : enterFullscreen());
     });
 
     // Color swatches
     this.el.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const colorId = btn.dataset['color'] as ColorModeId;
         if (colorId) this.setColor(colorId);
       });
@@ -139,17 +184,16 @@ export class FlashView {
 
     // Utility buttons
     this.el.querySelectorAll<HTMLButtonElement>('.utility-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const utilityId = btn.dataset['utility'] as UtilityModeId;
         if (!utilityId) return;
-
         const current = getActiveUtility();
         if (current === utilityId) {
           stopUtility();
           this.updateUtilityUI(null);
         } else {
           startUtility(utilityId, (on, opacity) => {
-            // Apply flash effect to background layer only, keeping controls visible
             this.bg.style.opacity = on ? String(opacity ?? 1) : '0';
           });
           this.updateUtilityUI(utilityId);
@@ -159,29 +203,52 @@ export class FlashView {
 
     // Brightness slider
     const slider = this.el.querySelector<HTMLInputElement>('#brightness-slider');
-    slider?.addEventListener('input', () => {
+    slider?.addEventListener('input', (e) => {
+      e.stopPropagation();
       const val = Number(slider.value);
       this.applyBrightness(val);
       updateSettings({ brightness: val });
     });
 
-    // Cursor / controls hide on inactivity
-    const onActivity = () => this.resetInactivityTimers();
-    this.el.addEventListener('mousemove', onActivity);
-    this.el.addEventListener('touchstart', onActivity, { passive: true });
-    this.el.addEventListener('click', onActivity);
-    this.cleanups.push(() => {
-      this.el.removeEventListener('mousemove', onActivity);
-      this.el.removeEventListener('touchstart', onActivity);
-      this.el.removeEventListener('click', onActivity);
+    // Sheet drag-to-dismiss (touch)
+    const handleArea = this.el.querySelector<HTMLElement>('#sheet-handle-area');
+    handleArea?.addEventListener('touchstart', (e) => {
+      this.isDragging = true;
+      this.dragStartY = e.touches[0]?.clientY ?? 0;
+      this.dragCurrentY = this.dragStartY;
+      this.sheet.style.transition = 'none';
+    }, { passive: true });
+
+    handleArea?.addEventListener('touchmove', (e) => {
+      if (!this.isDragging) return;
+      this.dragCurrentY = e.touches[0]?.clientY ?? 0;
+      const delta = Math.max(0, this.dragCurrentY - this.dragStartY);
+      this.sheet.style.transform = `translateY(${delta}px)`;
+    }, { passive: true });
+
+    handleArea?.addEventListener('touchend', () => {
+      if (!this.isDragging) return;
+      this.isDragging = false;
+      this.sheet.style.transition = '';
+      const delta = this.dragCurrentY - this.dragStartY;
+      if (delta > 80) {
+        this.hideSheet();
+      } else {
+        this.sheet.style.transform = '';
+      }
     });
 
-    // Keyboard shortcuts
+    // Keyboard
     const onKeyDown = (e: KeyboardEvent) => {
       if (!this.isVisible) return;
       switch (e.key) {
         case 'Escape':
-          bus.emit('view:change', 'landing');
+          if (this.sheetVisible) this.hideSheet();
+          else bus.emit('view:change', 'landing');
+          break;
+        case ' ':
+          e.preventDefault();
+          this.toggleSheet();
           break;
         case 'ArrowUp':
           e.preventDefault();
@@ -206,31 +273,17 @@ export class FlashView {
     document.addEventListener('keydown', onKeyDown);
     this.cleanups.push(() => document.removeEventListener('keydown', onKeyDown));
 
-    // Touch swipe down to exit
-    let touchStartY = 0;
-    this.el.addEventListener('touchstart', (e) => {
-      touchStartY = e.touches[0]?.clientY ?? 0;
-    }, { passive: true });
-    this.el.addEventListener('touchend', (e) => {
-      const endY = e.changedTouches[0]?.clientY ?? 0;
-      if (endY - touchStartY > 80) {
-        bus.emit('view:change', 'landing');
-      }
-    }, { passive: true });
+    // Cursor hide
+    const onActivity = () => this.resetCursorTimer();
+    this.el.addEventListener('mousemove', onActivity);
+    this.cleanups.push(() => this.el.removeEventListener('mousemove', onActivity));
 
-    // Wake lock status
-    const unsub = bus.on<boolean>('wakelock:change', (active) => {
-      this.updateWakeLockUI(active);
-    });
+    // Wake lock
+    const unsub = bus.on<boolean>('wakelock:change', (_active) => { /* status tracked internally */ });
     this.cleanups.push(unsub);
 
     // Fullscreen change
-    const unsubFs = bus.on<boolean>('fullscreen:change', (active) => {
-      if (!active && this.isVisible) {
-        // User pressed ESC in fullscreen – stay in flash mode
-        showToast('Press ESC again or swipe down to exit Flash');
-      }
-    });
+    const unsubFs = bus.on<boolean>('fullscreen:change', (_active) => { /* no-op */ });
     this.cleanups.push(unsubFs);
   }
 
@@ -238,27 +291,41 @@ export class FlashView {
     return this.el.querySelector<HTMLElement>('.flash-bg') ?? this.el;
   }
 
+  private toggleSheet(): void {
+    if (this.sheetVisible) this.hideSheet();
+    else this.showSheet();
+  }
+
+  private showSheet(): void {
+    this.sheetVisible = true;
+    this.sheet.classList.add('flash-sheet--visible');
+    this.sheet.setAttribute('aria-hidden', 'false');
+    // Focus first interactive element
+    const first = this.sheet.querySelector<HTMLElement>('input, button');
+    first?.focus();
+  }
+
+  private hideSheet(): void {
+    this.sheetVisible = false;
+    this.sheet.style.transform = '';
+    this.sheet.classList.remove('flash-sheet--visible');
+    this.sheet.setAttribute('aria-hidden', 'true');
+  }
+
   private setColor(colorId: ColorModeId): void {
     const mode = COLOR_MODES.find((m) => m.id === colorId);
     if (!mode) return;
-
     this.bg.style.backgroundColor = mode.color;
     updateSettings({ selectedColor: colorId });
-
-    // Update swatch active state
     this.el.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach((btn) => {
       const isActive = btn.dataset['color'] === colorId;
       btn.classList.toggle('color-swatch--active', isActive);
       btn.setAttribute('aria-pressed', String(isActive));
     });
-
-    // Stop any active utility when changing color
     if (getActiveUtility()) {
       stopUtility();
       this.updateUtilityUI(null);
     }
-
-    // Reset background opacity
     this.bg.style.opacity = '1';
   }
 
@@ -270,55 +337,20 @@ export class FlashView {
     });
   }
 
-  private updateWakeLockUI(active: boolean): void {
-    const dot = this.el.querySelector('#wakelock-dot');
-    const label = this.el.querySelector('#status-label');
-    dot?.classList.toggle('status-dot--active', active);
-    if (label) label.textContent = active ? 'Wake Lock On' : 'Flash';
-  }
-
   private applyBrightness(value: number): void {
-    // Apply brightness only to the background layer, not the controls overlay.
-    // We use a CSS custom property that drives the background pseudo-element opacity.
     const normalized = value / 100;
-    this.el.style.setProperty('--flash-brightness', String(normalized));
-    // The background div (first child) gets the filter; controls are siblings above it.
     const bg = this.el.querySelector<HTMLElement>('.flash-bg');
-    if (bg) {
-      bg.style.filter = `brightness(${normalized})`;
-    } else {
-      // Fallback: apply to whole element (controls will dim too, acceptable degradation)
-      this.el.style.filter = `brightness(${normalized})`;
-    }
+    if (bg) bg.style.filter = `brightness(${normalized})`;
   }
 
-  private resetInactivityTimers(): void {
+  private resetCursorTimer(): void {
     const settings = getSettings();
-
-    // Show controls
-    this.topbar.classList.remove('flash-topbar--hidden');
-    this.controls.classList.remove('flash-controls--hidden');
-
-    // Show cursor
-    if (!settings.cursorVisible) {
-      this.el.classList.remove('flash-view--cursor-visible');
-    }
-
-    // Reset cursor hide timer
+    if (settings.cursorVisible) return;
+    this.el.style.cursor = 'default';
     if (this.cursorTimer) clearTimeout(this.cursorTimer);
-    if (!settings.cursorVisible) {
-      this.cursorTimer = setTimeout(() => {
-        this.el.classList.add('flash-view--cursor-visible');
-        this.el.style.cursor = 'none';
-      }, CURSOR_HIDE_DELAY);
-    }
-
-    // Reset controls hide timer
-    if (this.controlsTimer) clearTimeout(this.controlsTimer);
-    this.controlsTimer = setTimeout(() => {
-      this.topbar.classList.add('flash-topbar--hidden');
-      this.controls.classList.add('flash-controls--hidden');
-    }, CURSOR_HIDE_DELAY + 500);
+    this.cursorTimer = setTimeout(() => {
+      if (!this.sheetVisible) this.el.style.cursor = 'none';
+    }, CURSOR_HIDE_DELAY);
   }
 
   async show(): Promise<void> {
@@ -340,12 +372,9 @@ export class FlashView {
       this.applyBrightness(settings.brightness);
     }
 
-    // Show
+    this.bg.style.opacity = '1';
     this.el.classList.remove('flash-view--hidden');
     this.isVisible = true;
-
-    // Reset background opacity
-    this.bg.style.opacity = '1';
 
     // Fullscreen
     if (settings.autoFullscreen) {
@@ -363,35 +392,20 @@ export class FlashView {
       }
     }
 
-    // Start inactivity timers
-    this.resetInactivityTimers();
-
-    // Announce to screen readers
-    this.el.setAttribute('aria-label', `Flash active – ${savedColor.label} mode`);
+    this.resetCursorTimer();
+    this.el.setAttribute('aria-label', `Flash active – ${savedColor.label}`);
   }
 
   async hide(): Promise<void> {
     this.isVisible = false;
-
-    // Stop utilities
+    this.hideSheet();
     stopUtility();
     this.updateUtilityUI(null);
-
-    // Clear timers
     if (this.cursorTimer) clearTimeout(this.cursorTimer);
-    if (this.controlsTimer) clearTimeout(this.controlsTimer);
-
-    // Release wake lock
     await releaseWakeLock();
-
-    // Exit fullscreen
     await exitFullscreen();
-
-    // Hide
     this.el.classList.add('flash-view--hidden');
-
-    // Reset cursor
-    this.el.classList.remove('flash-view--cursor-visible');
+    this.el.style.cursor = '';
   }
 
   destroy(): void {
