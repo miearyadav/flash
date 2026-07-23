@@ -221,10 +221,6 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-flash);
-<<<<<<< HEAD
-  cursor: none;
-  transition: opacity var(--duration-enter) var(--ease-out);
-=======
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -234,7 +230,6 @@
   cursor: none;
 }
 
-/* Background layer — brightness filter is applied here so controls stay crisp */
 .flash-bg {
   position: absolute;
   inset: 0;
@@ -243,7 +238,6 @@
   z-index: 0;
 }
 
-/* All direct children above the background */
 .flash-view > *:not(.flash-bg) {
   position: relative;
   z-index: 1;
@@ -251,7 +245,6 @@
 
 .flash-view--cursor-visible {
   cursor: default;
->>>>>>> 94c973a7034290d01fcdc8a8a0fa1d16af785faf
 }
 
 .flash-view--hidden {
@@ -259,15 +252,7 @@
   pointer-events: none;
 }
 
-/* Full-screen background — brightness filter applied here only */
-.flash-bg {
-  position: absolute;
-  inset: 0;
-  background: #FFFFFF;
-  transition: background-color var(--duration-slow) var(--ease-out);
-  z-index: 0;
-  cursor: none;
-}
+
 
 /* ─── Bottom Sheet ───────────────────────────────────────────────────────── */
 
