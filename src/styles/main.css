@@ -230,9 +230,24 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #FFFFFF;
-  transition: background-color var(--duration-slow) var(--ease-out), opacity var(--duration-enter) var(--ease-out);
+  background: transparent;
+  transition: opacity var(--duration-enter) var(--ease-out);
   cursor: none;
+}
+
+/* Background layer — brightness filter is applied here so controls stay crisp */
+.flash-bg {
+  position: absolute;
+  inset: 0;
+  background: #FFFFFF;
+  transition: background-color var(--duration-slow) var(--ease-out);
+  z-index: 0;
+}
+
+/* All direct children above the background */
+.flash-view > *:not(.flash-bg) {
+  position: relative;
+  z-index: 1;
 }
 
 .flash-view--cursor-visible {

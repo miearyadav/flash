@@ -63,6 +63,9 @@ export class FlashView {
     ).join('');
 
     el.innerHTML = `
+      <!-- Background layer (brightness filter applied here only) -->
+      <div class="flash-bg" aria-hidden="true"></div>
+
       <!-- Top Bar -->
       <div class="flash-topbar" role="toolbar" aria-label="Flash controls">
         <button class="flash-exit-btn" id="flash-exit-btn" aria-label="Exit Flash mode">
@@ -146,7 +149,8 @@ export class FlashView {
           this.updateUtilityUI(null);
         } else {
           startUtility(utilityId, (on, opacity) => {
-            this.el.style.opacity = on ? String(opacity ?? 1) : '0';
+            // Apply flash effect to background layer only, keeping controls visible
+            this.bg.style.opacity = on ? String(opacity ?? 1) : '0';
           });
           this.updateUtilityUI(utilityId);
         }
@@ -230,11 +234,15 @@ export class FlashView {
     this.cleanups.push(unsubFs);
   }
 
+  private get bg(): HTMLElement {
+    return this.el.querySelector<HTMLElement>('.flash-bg') ?? this.el;
+  }
+
   private setColor(colorId: ColorModeId): void {
     const mode = COLOR_MODES.find((m) => m.id === colorId);
     if (!mode) return;
 
-    this.el.style.backgroundColor = mode.color;
+    this.bg.style.backgroundColor = mode.color;
     updateSettings({ selectedColor: colorId });
 
     // Update swatch active state
@@ -250,8 +258,8 @@ export class FlashView {
       this.updateUtilityUI(null);
     }
 
-    // Reset opacity
-    this.el.style.opacity = '1';
+    // Reset background opacity
+    this.bg.style.opacity = '1';
   }
 
   private updateUtilityUI(activeId: UtilityModeId | null): void {
@@ -270,12 +278,18 @@ export class FlashView {
   }
 
   private applyBrightness(value: number): void {
-    // Brightness via CSS filter on a wrapper or direct opacity on a dark overlay
+    // Apply brightness only to the background layer, not the controls overlay.
+    // We use a CSS custom property that drives the background pseudo-element opacity.
     const normalized = value / 100;
-    // We use a CSS custom property to drive a brightness filter
     this.el.style.setProperty('--flash-brightness', String(normalized));
-    // Apply via filter for true brightness control
-    this.el.style.filter = `brightness(${normalized})`;
+    // The background div (first child) gets the filter; controls are siblings above it.
+    const bg = this.el.querySelector<HTMLElement>('.flash-bg');
+    if (bg) {
+      bg.style.filter = `brightness(${normalized})`;
+    } else {
+      // Fallback: apply to whole element (controls will dim too, acceptable degradation)
+      this.el.style.filter = `brightness(${normalized})`;
+    }
   }
 
   private resetInactivityTimers(): void {
@@ -312,7 +326,7 @@ export class FlashView {
 
     // Apply saved color
     const savedColor = COLOR_MODES.find((m) => m.id === settings.selectedColor) ?? COLOR_MODES[0]!;
-    this.el.style.backgroundColor = savedColor.color;
+    this.bg.style.backgroundColor = savedColor.color;
     this.el.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach((btn) => {
       const isActive = btn.dataset['color'] === settings.selectedColor;
       btn.classList.toggle('color-swatch--active', isActive);
@@ -330,8 +344,8 @@ export class FlashView {
     this.el.classList.remove('flash-view--hidden');
     this.isVisible = true;
 
-    // Reset opacity
-    this.el.style.opacity = '1';
+    // Reset background opacity
+    this.bg.style.opacity = '1';
 
     // Fullscreen
     if (settings.autoFullscreen) {
