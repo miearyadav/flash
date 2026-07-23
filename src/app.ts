@@ -2,7 +2,14 @@ import { bus } from './core/eventBus.js';
 import { LandingView } from './components/landing.js';
 import { FlashView } from './components/flash.js';
 import { InstallBanner } from './components/installBanner.js';
-import type { AppView } from './core/types.js';
+import { getSettings } from './core/settings.js';
+import type { AppView, FlashSettings } from './core/types.js';
+
+const ANIMATION_SPEED_MAP: Record<FlashSettings['animationSpeed'], string> = {
+  slow: '2',
+  normal: '1',
+  fast: '0.5',
+};
 
 export class App {
   private readonly container: HTMLElement;
@@ -18,8 +25,21 @@ export class App {
     this.flash = new FlashView(this.container);
     this.installBanner = new InstallBanner();
 
+    this.applyAnimationSpeed(getSettings().animationSpeed);
     this.bindEvents();
     this.navigateTo('landing');
+  }
+
+  private applyAnimationSpeed(speed: FlashSettings['animationSpeed']): void {
+    const multiplier = ANIMATION_SPEED_MAP[speed];
+    document.documentElement.style.setProperty('--animation-speed-multiplier', multiplier);
+    // Recompute duration tokens based on multiplier
+    const base = { fast: 120, normal: 220, slow: 380, enter: 500 };
+    const m = parseFloat(multiplier);
+    document.documentElement.style.setProperty('--duration-fast', `${Math.round(base.fast * m)}ms`);
+    document.documentElement.style.setProperty('--duration-normal', `${Math.round(base.normal * m)}ms`);
+    document.documentElement.style.setProperty('--duration-slow', `${Math.round(base.slow * m)}ms`);
+    document.documentElement.style.setProperty('--duration-enter', `${Math.round(base.enter * m)}ms`);
   }
 
   private bindEvents(): void {
@@ -27,6 +47,11 @@ export class App {
       void this.navigateTo(view);
     });
     this.cleanups.push(unsub);
+
+    const unsubSettings = bus.on<FlashSettings>('settings:change', (s) => {
+      this.applyAnimationSpeed(s.animationSpeed);
+    });
+    this.cleanups.push(unsubSettings);
   }
 
   private async navigateTo(view: AppView): Promise<void> {
