@@ -45,7 +45,7 @@ export const COLOR_MODES: ColorMode[] = [
     color: '#2979FF',
     description: 'Blue light, calm and focused',
   },
-] as const;
+];
 
 // ─── Utility Modes ──────────────────────────────────────────────────────────
 
@@ -74,7 +74,7 @@ export const UTILITY_MODES: UtilityMode[] = [
     description: 'Smooth breathing effect',
     icon: '💫',
   },
-] as const;
+];
 
 // ─── Default Settings ────────────────────────────────────────────────────────
 

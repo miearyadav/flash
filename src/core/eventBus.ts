@@ -9,7 +9,7 @@ class EventBus {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    const set = this.listeners.get(event)!;
+    const set = this.listeners.get(event) as Set<Listener>;
     set.add(listener as Listener);
 
     return () => {

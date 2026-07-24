@@ -5,7 +5,7 @@ import { enterFullscreen, exitFullscreen, isFullscreen } from '../core/fullscree
 import { requestWakeLock, releaseWakeLock, isWakeLockSupported } from '../core/wakeLock.js';
 import { startUtility, stopUtility, getActiveUtility } from '../core/utilities.js';
 import { showToast } from './toast.js';
-import type { ColorModeId, ColorMode, UtilityModeId } from '../core/types.js';
+import type { ColorModeId, UtilityModeId } from '../core/types.js';
 
 export class FlashView {
   private readonly el: HTMLElement;
@@ -23,15 +23,9 @@ export class FlashView {
 
   constructor(container: HTMLElement) {
     this.el = this.buildFlashScreen();
-    this.sheet = this.el.querySelector('.flash-sheet') as HTMLElement;
+    this.sheet = this.el.querySelector('.flash-sheet')!;
     container.appendChild(this.el);
     this.bindEvents();
-    // Initialize sheet to hidden state (scaleY(0) from top center)
-    this.sheet.style.transformOrigin = 'top center';
-    this.sheet.style.transform = 'scaleY(0)';
-    this.sheet.setAttribute('aria-hidden', 'true');
-    // Ensure it doesn't have the visible class initially
-    this.sheet.classList.remove('flash-sheet--visible');
   }
 
   private buildFlashScreen(): HTMLElement {
@@ -144,7 +138,7 @@ export class FlashView {
               Settings
             </button>
 
-            <button class="sheet-power-btn" id="flash-power-btn" aria-label="Turn off Flash">
+            <button class="sheet-power-btn" id="flash-exit-btn" aria-label="Turn off Flash">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="20" height="20">
                 <path d="M12 3v9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
                 <path d="M6.34 6.34A9 9 0 1 0 17.66 6.34" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
@@ -172,14 +166,8 @@ export class FlashView {
       this.toggleSheet();
     });
 
-    // Exit (power off) - top bar button
+    // Exit (power off)
     this.el.querySelector('#flash-exit-btn')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      bus.emit('view:change', 'landing');
-    });
-
-    // Exit (power off) - sheet button
-    this.el.querySelector('#flash-power-btn')?.addEventListener('click', (e) => {
       e.stopPropagation();
       bus.emit('view:change', 'landing');
     });
@@ -239,48 +227,30 @@ export class FlashView {
 
     // Sheet drag-to-dismiss (touch)
     const handleArea = this.el.querySelector<HTMLElement>('#sheet-handle-area');
-    let dragStartY = 0;
-    let dragStartScaleY = 0; // 0 for hidden, 1 for visible
-
     handleArea?.addEventListener('touchstart', (e) => {
       this.isDragging = true;
       this.dragStartY = e.touches[0]?.clientY ?? 0;
       this.dragCurrentY = this.dragStartY;
-      // Capture the base scale state based on visibility, not current transform
-      dragStartY = this.dragStartY;
-      dragStartScaleY = this.sheetVisible ? 1 : 0;
-      // Override transition for dragging
       this.sheet.style.transition = 'none';
     }, { passive: true });
 
     handleArea?.addEventListener('touchmove', (e) => {
       if (!this.isDragging) return;
       this.dragCurrentY = e.touches[0]?.clientY ?? 0;
-      const delta = Math.max(0, this.dragCurrentY - dragStartY);
-      // Apply drag translation to the base scale state
-      this.sheet.style.transform = `scaleY(${dragStartScaleY}) translateY(${delta}px)`;
+      const delta = Math.max(0, this.dragCurrentY - this.dragStartY);
+      this.sheet.style.transform = `translateY(${delta}px)`;
     }, { passive: true });
 
     handleArea?.addEventListener('touchend', () => {
       if (!this.isDragging) return;
       this.isDragging = false;
-      const delta = this.dragCurrentY - dragStartY;
-      // Determine target scale based on drag distance
-      const targetScaleY = delta > 80 ? 0 : dragStartScaleY;
-      // Animate from current dragged position to target resting position
-      // First, ensure we're at the exact current position (no transition)
-      this.sheet.style.transform = `scaleY(${dragStartScaleY}) translateY(${delta}px)`;
-      // Then enable transition and animate to target
-      void this.sheet.getBoundingClientRect(); // Trigger reflow
-      this.sheet.style.transition = 'transform 0.3s ease';
-      this.sheet.style.transform = `scaleY(${targetScaleY})`;
-      // Clean up after transition ends
-      const cleanup = () => {
-        this.sheet.style.transition = '';
+      this.sheet.style.transition = '';
+      const delta = this.dragCurrentY - this.dragStartY;
+      if (delta > 80) {
+        this.hideSheet();
+      } else {
         this.sheet.style.transform = '';
-        this.sheet.style.transformOrigin = '';
-      };
-      this.sheet.addEventListener('transitionend', cleanup, { once: true });
+      }
     });
 
     // Keyboard
@@ -343,50 +313,18 @@ export class FlashView {
 
   private showSheet(): void {
     this.sheetVisible = true;
-    // Add class for CSS styling (position, z-index, etc.)
     this.sheet.classList.add('flash-sheet--visible');
-    // Set up for center-down animation via inline styles
-    this.sheet.style.transformOrigin = 'top center';
-    this.sheet.style.transform = 'scaleY(0)';
-    // Trigger reflow to ensure transition works
-    void this.sheet.getBoundingClientRect();
-    // Animate to visible
-    this.sheet.style.transition = 'transform 0.3s ease';
-    this.sheet.style.transform = 'scaleY(1)';
     this.sheet.setAttribute('aria-hidden', 'false');
     // Focus first interactive element
     const first = this.sheet.querySelector<HTMLElement>('input, button');
     first?.focus();
-
-    // Clean up transform properties after transition ends
-    const cleanup = () => {
-      this.sheet.style.transition = '';
-      this.sheet.style.transform = '';
-      this.sheet.style.transformOrigin = '';
-    };
-    this.sheet.addEventListener('transitionend', cleanup, { once: true });
   }
 
   private hideSheet(): void {
     this.sheetVisible = false;
-    // Update state immediately
-    // Set up for hide animation via inline styles
-    this.sheet.style.transformOrigin = 'top center';
-    this.sheet.style.transform = 'scaleY(1)';
-    // Trigger reflow
-    void this.sheet.getBoundingClientRect();
-    // Animate to hidden
-    this.sheet.style.transition = 'transform 0.3s ease';
-    this.sheet.style.transform = 'scaleY(0)';
-    // We'll remove the class and set aria-hidden after transition
-    const cleanup = () => {
-      this.sheet.classList.remove('flash-sheet--visible');
-      this.sheet.setAttribute('aria-hidden', 'true');
-      this.sheet.style.transition = '';
-      this.sheet.style.transform = '';
-      this.sheet.style.transformOrigin = '';
-    };
-    this.sheet.addEventListener('transitionend', cleanup, { once: true });
+    this.sheet.style.transform = '';
+    this.sheet.classList.remove('flash-sheet--visible');
+    this.sheet.setAttribute('aria-hidden', 'true');
   }
 
   private setColor(colorId: ColorModeId): void {
@@ -441,9 +379,7 @@ export class FlashView {
     const settings = getSettings();
 
     // Apply saved color
-    const found = COLOR_MODES.find((m) => m.id === settings.selectedColor);
-    const defaultColor = COLOR_MODES[0];
-    const savedColor = (found ?? defaultColor) as ColorMode;
+    const savedColor = COLOR_MODES.find((m) => m.id === settings.selectedColor) ?? COLOR_MODES[0]!;
     this.bg.style.backgroundColor = savedColor.color;
     this.el.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach((btn) => {
       const isActive = btn.dataset['color'] === settings.selectedColor;
@@ -462,11 +398,6 @@ export class FlashView {
     this.bg.style.opacity = '1';
     this.el.classList.remove('flash-view--hidden');
     this.isVisible = true;
-    // Hide top bar when flash is active (nothing visible on screen)
-    const topBar = this.el.querySelector('.flash-topbar');
-    if (topBar) {
-      (topBar as HTMLElement).style.display = 'none';
-    }
     // Fullscreen
     if (settings.autoFullscreen) {
       const ok = await enterFullscreen();
@@ -489,15 +420,7 @@ export class FlashView {
 
   async hide(): Promise<void> {
     this.isVisible = false;
-    // Only hide the sheet with animation if it's currently visible
-    if (this.sheetVisible) {
-      this.hideSheet();
-      // hideSheet() will handle hiding the element and setting aria-hidden in its cleanup
-    } else {
-      // Ensure it's in the hidden state (handles case where it was already hidden)
-      this.sheet.setAttribute('aria-hidden', 'true');
-      this.sheet.classList.remove('flash-sheet--visible');
-    }
+    this.hideSheet();
     stopUtility();
     this.updateUtilityUI(null);
     if (this.cursorTimer) clearTimeout(this.cursorTimer);
@@ -505,11 +428,6 @@ export class FlashView {
     await exitFullscreen();
     this.el.classList.add('flash-view--hidden');
     this.el.style.cursor = '';
-    // Show top bar when flash is hidden
-    const topBar = this.el.querySelector('.flash-topbar');
-    if (topBar) {
-      (topBar as HTMLElement).style.display = '';
-    }
   }
 
   destroy(): void {

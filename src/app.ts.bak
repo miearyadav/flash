@@ -27,7 +27,7 @@ export class App {
 
     this.applyAnimationSpeed(getSettings().animationSpeed);
     this.bindEvents();
-    this.navigateTo('landing').catch(err => { console.error('Failed to navigate to initial view:', err); });
+    this.navigateTo('landing');
   }
 
   private applyAnimationSpeed(speed: FlashSettings['animationSpeed']): void {

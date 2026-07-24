@@ -13,21 +13,6 @@ export default [
         sourceType: 'module',
         project: './tsconfig.app.json',
       },
-      globals: {
-        // Browser globals
-        window: true,
-        document: true,
-        navigator: true,
-        localStorage: true,
-        setTimeout: true,
-        clearTimeout: true,
-        setInterval: true,
-        clearInterval: true,
-        requestAnimationFrame: true,
-        cancelAnimationFrame: true,
-        // eslint globals
-        console: true,
-      },
     },
     plugins: {
       '@typescript-eslint': tsPlugin,

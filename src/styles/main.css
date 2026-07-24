@@ -48,13 +48,19 @@
 
 .landing > * { position: relative; z-index: 1; }
 
+.landing-content {
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: var(--space-4);
+  justify-items: center;
+  width: 100%;
+  max-width: 280px;
+  text-align: center;
+}
+
 /* ─── Wordmark ───────────────────────────────────────────────────────────── */
 
 .landing-wordmark {
-  position: absolute;
-  top: max(var(--space-10), env(safe-area-inset-top, 0px) + var(--space-6));
-  left: 50%;
-  transform: translateX(-50%);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-wider);
@@ -80,7 +86,6 @@
   -webkit-tap-highlight-color: transparent;
   outline: none;
   /* Shift slightly above center for visual balance */
-  margin-bottom: var(--space-8);
 }
 
 /* Outer ambient ring — always visible, very subtle */
@@ -177,16 +182,11 @@
   font-weight: var(--weight-regular);
   color: rgba(255,255,255,0.22);
   letter-spacing: var(--tracking-normal);
-  margin-top: var(--space-2);
 }
 
 /* ─── Settings button ────────────────────────────────────────────────────── */
 
 .landing-settings-btn {
-  position: absolute;
-  bottom: max(var(--space-10), env(safe-area-inset-bottom, 0px) + var(--space-6));
-  left: 50%;
-  transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -238,7 +238,7 @@
   z-index: 0;
 }
 
-.flash-view > *:not(.flash-bg) {
+.flash-view > *:not(.flash-bg):not(.flash-sheet) {
   position: relative;
   z-index: 1;
 }

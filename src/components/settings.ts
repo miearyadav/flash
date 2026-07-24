@@ -11,7 +11,7 @@ export class SettingsPanel {
 
   constructor() {
     this.overlay = this.buildOverlay();
-    this.panel = this.overlay.querySelector('.settings-panel')!;
+    this.panel = this.overlay.querySelector('.settings-panel') as HTMLElement;
     document.body.appendChild(this.overlay);
     this.bindEvents();
   }
